@@ -1,3 +1,10 @@
+# Folders
+Release/
+.vs/
+
+# Logs
+*.tlog
+
 # Prerequisites
 *.d
 
@@ -6,6 +13,9 @@
 *.lo
 *.o
 *.obj
+*.pdb
+*.log
+*.iobj
 
 # Precompiled Headers
 *.gch
