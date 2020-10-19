@@ -7,6 +7,9 @@
 const DWORD func_addr = 0x00417FB1; //address of the instruction that returns the new random value
 const DWORD func_addr_offset = func_addr + 0x2;
 
+const DWORD func_addr2 = 0x01EE345B; //just when you think you're done
+const DWORD func_addr2_offset = func_addr2 + 0x2;
+
 //default randomization code
 void __declspec(naked) func_stub(void) {
     __asm {
@@ -15,17 +18,35 @@ void __declspec(naked) func_stub(void) {
     }
 }
 
+//second default randomization code
+void __declspec(naked) func_stub2(void) {
+    __asm {
+        mov[esi], ecx
+        jmp[func_addr2_offset]
+    }
+}
+
 LONG WINAPI ExceptionFilter(PEXCEPTION_POINTERS ExceptionInfo) {
     if (ExceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_SINGLE_STEP) {
-        if ((DWORD)ExceptionInfo->ExceptionRecord->ExceptionAddress == func_addr) {
-            PCONTEXT debug_context = ExceptionInfo->ContextRecord;
+        std::random_device rd; // random number
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> distr(12151879, 800930084); //Generate a huge number
+        PCONTEXT debug_context = ExceptionInfo->ContextRecord;
+        switch ((DWORD)ExceptionInfo->ExceptionRecord->ExceptionAddress)
+        {
+        case func_addr:
             debug_context->Eip = (DWORD)&func_stub;
-            std::random_device rd; // random number
-            std::mt19937 gen(rd());
-            std::uniform_int_distribution<> distr(12151879, 800930084); //Generate a huge number
             debug_context->Eax = distr(gen) + debug_context->Eax; //Offset the return value of the random function with our own random number
             return EXCEPTION_CONTINUE_EXECUTION;
+        case func_addr2:
+            debug_context->Eip = (DWORD)&func_stub2;
+            debug_context->Ecx = distr(gen) + debug_context->Ecx; //Offset the return value of the random function with our own random number
+            return EXCEPTION_CONTINUE_EXECUTION;
         }
+        /*
+        if ((DWORD)ExceptionInfo->ExceptionRecord->ExceptionAddress == func_addr) {
+            
+        }*/
     }
     return EXCEPTION_CONTINUE_SEARCH;
 }
@@ -63,7 +84,8 @@ void set_breakpoints(void) {
             } while (Thread32Next(hTool32, &thread_entry32));
             AddVectoredExceptionHandler(1, ExceptionFilter);
             CONTEXT thread_context = { CONTEXT_DEBUG_REGISTERS };
-            thread_context.Dr0 = func_addr;
+            thread_context.Dr0 = func_addr2;
+            thread_context.Dr1 = func_addr;
             thread_context.Dr7 = (1 << 0);
             SetThreadContext(hMainThread, &thread_context);
             CloseHandle(hMainThread);
